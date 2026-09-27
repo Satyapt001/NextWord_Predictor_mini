@@ -1,0 +1,16 @@
+{
+    "model_name": "Next Word Predictor",
+    "model_type": "Hybrid N-gram + LSTM",
+    "framework": "TensorFlow/Keras",
+    "vocab_size": 207,
+    "max_sequence_len": 42,
+    "embedding_dim": 128,
+    "lstm_units": 128,
+    "ngram_orders": [
+        2,
+        3,
+        4,
+        5
+    ],
+    "version": "1.0.0"
+}

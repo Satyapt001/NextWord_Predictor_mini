@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <meta
+        name="description"
+        content="AI-powered next word prediction"
+    >
+
+    <title>NextWord — AI Text Prediction</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+
+    <div class="app">
+
+        <!-- Header -->
+        <header class="header">
+
+            <div class="brand">
+                <div class="brand-icon">
+                    N
+                </div>
+
+                <div>
+                    <h1>NextWord</h1>
+                    <span>AI text prediction</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+
+                <button
+                    id="themeToggle"
+                    class="icon-button"
+                    type="button"
+                    aria-label="Toggle theme"
+                    title="Toggle theme"
+                >
+                    <span id="themeIcon">☾</span>
+                </button>
+
+                <button
+                    id="clearButton"
+                    class="clear-button"
+                    type="button"
+                >
+                    Clear
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- Main -->
+        <main class="main">
+
+            <section class="hero">
+
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">PREDICTIVE WRITING</p>
+
+                        <h2>
+                            Write naturally.
+                        </h2>
+
+                        <p class="subtitle">
+                            Start typing and choose a suggested next word.
+                        </p>
+                    </div>
+
+                    <div class="status">
+                        <span class="status-dot"></span>
+                        Ready
+                    </div>
+                </div>
+
+
+                <!-- Editor -->
+                <div class="editor-wrapper">
+
+                    <textarea
+                        id="textInput"
+                        class="editor"
+                        placeholder="Start writing here..."
+                        spellcheck="true"
+                        autocomplete="off"
+                        autocorrect="off"
+                    ></textarea>
+
+                    <div class="editor-footer">
+
+                        <span id="wordCount">
+                            0 words
+                        </span>
+
+                        <span>
+                            <kbd>Ctrl</kbd>
+                            <kbd>Enter</kbd>
+                            predict
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <!-- Suggestions -->
+                <div class="suggestions-section">
+
+                    <div class="suggestions-header">
+
+                        <span>
+                            Suggestions
+                        </span>
+
+                        <span
+                            id="suggestionStatus"
+                            class="suggestion-status"
+                        >
+                            Waiting for text
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        id="suggestions"
+                        class="suggestions"
+                    >
+
+                        <div class="empty-state">
+                            <span class="empty-icon">→</span>
+                            <span>
+                                Type something to see suggestions
+                            </span>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Information -->
+            <section class="info-grid">
+
+                <div class="info-card">
+
+                    <div class="info-icon">
+                        AI
+                    </div>
+
+                    <div>
+                        <h3>LSTM prediction</h3>
+
+                        <p>
+                            Suggestions are generated from the
+                            trained language model.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="info-card">
+
+                    <div class="info-icon">
+                        ↗
+                    </div>
+
+                    <div>
+                        <h3>Context aware</h3>
+
+                        <p>
+                            Predictions are ranked according
+                            to the text you provide.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div class="info-card">
+
+                    <div class="info-icon">
+                        +
+                    </div>
+
+                    <div>
+                        <h3>Expandable</h3>
+
+                        <p>
+                            The system can later support
+                            larger datasets and models.
+                        </p>
+                    </div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+
+        <!-- Footer -->
+        <footer class="footer">
+
+            <span>
+                NextWord
+            </span>
+
+            <span>
+                LSTM Language Model
+            </span>
+
+        </footer>
+
+    </div>
+
+
+    <script>
+
+        const textInput = document.getElementById("textInput");
+        const suggestionsContainer =
+            document.getElementById("suggestions");
+
+        const suggestionStatus =
+            document.getElementById("suggestionStatus");
+
+        const wordCount =
+            document.getElementById("wordCount");
+
+        const clearButton =
+            document.getElementById("clearButton");
+
+        const themeToggle =
+            document.getElementById("themeToggle");
+
+        const themeIcon =
+            document.getElementById("themeIcon");
+
+
+        let predictionTimeout = null;
+
+
+        // --------------------------------------------
+        // Theme
+        // --------------------------------------------
+
+        function applyTheme(theme) {
+
+            document.documentElement.dataset.theme = theme;
+
+            localStorage.setItem(
+                "nextword-theme",
+                theme
+            );
+
+            themeIcon.textContent =
+                theme === "dark" ? "☀" : "☾";
+        }
+
+
+        const savedTheme =
+            localStorage.getItem("nextword-theme");
+
+        applyTheme(
+            savedTheme ||
+            (
+                window.matchMedia(
+                    "(prefers-color-scheme: dark)"
+                ).matches
+                    ? "dark"
+                    : "light"
+            )
+        );
+
+
+        themeToggle.addEventListener(
+            "click",
+            () => {
+
+                const current =
+                    document.documentElement.dataset.theme;
+
+                applyTheme(
+                    current === "dark"
+                        ? "light"
+                        : "dark"
+                );
+            }
+        );
+
+
+        // --------------------------------------------
+        // Word count
+        // --------------------------------------------
+
+        function updateWordCount() {
+
+            const text =
+                textInput.value.trim();
+
+            const count =
+                text
+                    ? text.split(/\s+/).length
+                    : 0;
+
+            wordCount.textContent =
+                `${count} ${count === 1 ? "word" : "words"}`;
+        }
+
+
+        // --------------------------------------------
+        // Empty suggestions
+        // --------------------------------------------
+
+        function showEmptyState(message) {
+
+            suggestionsContainer.innerHTML = `
+                <div class="empty-state">
+                    <span class="empty-icon">→</span>
+                    <span>${message}</span>
+                </div>
+            `;
+        }
+
+
+        // --------------------------------------------
+        // Prediction
+        // --------------------------------------------
+
+        async function getPredictions() {
+
+            const text =
+                textInput.value.trim();
+
+            updateWordCount();
+
+            if (!text) {
+
+                suggestionStatus.textContent =
+                    "Waiting for text";
+
+                showEmptyState(
+                    "Type something to see suggestions"
+                );
+
+                return;
+            }
+
+
+            suggestionStatus.textContent =
+                "Thinking...";
+
+
+            try {
+
+                const response =
+                    await fetch("/predict", {
+
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            text: text
+                        })
+                    });
+
+
+                if (!response.ok) {
+                    throw new Error(
+                        "Prediction request failed"
+                    );
+                }
+
+
+                const data =
+                    await response.json();
+
+                renderSuggestions(
+                    data.suggestions || []
+                );
+
+            } catch (error) {
+
+                console.error(error);
+
+                suggestionStatus.textContent =
+                    "Unavailable";
+
+                showEmptyState(
+                    "Unable to generate suggestions"
+                );
+            }
+        }
+
+
+        // --------------------------------------------
+        // Render suggestions
+        // --------------------------------------------
+
+        function renderSuggestions(words) {
+
+            suggestionsContainer.innerHTML = "";
+
+            if (!words.length) {
+
+                suggestionStatus.textContent =
+                    "No suggestions";
+
+                showEmptyState(
+                    "Try adding more context"
+                );
+
+                return;
+            }
+
+
+            suggestionStatus.textContent =
+                `${words.length} suggestions`;
+
+
+            words.forEach(
+                (word, index) => {
+
+                    const button =
+                        document.createElement("button");
+
+                    button.type = "button";
+
+                    button.className =
+                        "suggestion";
+
+                    if (index === 0) {
+                        button.classList.add(
+                            "primary-suggestion"
+                        );
+                    }
+
+
+                    button.innerHTML = `
+                        <span class="suggestion-word">
+                            ${escapeHTML(word)}
+                        </span>
+
+                        ${
+                            index === 0
+                                ? '<span class="best-label">Best</span>'
+                                : ''
+                        }
+                    `;
+
+
+                    button.addEventListener(
+                        "click",
+                        () => insertWord(word)
+                    );
+
+
+                    suggestionsContainer.appendChild(
+                        button
+                    );
+                }
+            );
+        }
+
+
+        // --------------------------------------------
+        // Insert selected word
+        // --------------------------------------------
+
+        function insertWord(word) {
+
+            const current =
+                textInput.value;
+
+            const trimmed =
+                current.trimEnd();
+
+
+            if (!trimmed) {
+
+                textInput.value =
+                    word + " ";
+
+            } else {
+
+                textInput.value =
+                    trimmed + " " + word + " ";
+            }
+
+
+            updateWordCount();
+
+            textInput.focus();
+
+            getPredictions();
+        }
+
+
+        // --------------------------------------------
+        // Clear
+        // --------------------------------------------
+
+        clearButton.addEventListener(
+            "click",
+            () => {
+
+                textInput.value = "";
+
+                updateWordCount();
+
+                suggestionStatus.textContent =
+                    "Waiting for text";
+
+                showEmptyState(
+                    "Type something to see suggestions"
+                );
+
+                textInput.focus();
+            }
+        );
+
+
+        // --------------------------------------------
+        // Input handling
+        // --------------------------------------------
+
+        textInput.addEventListener(
+            "input",
+            () => {
+
+                updateWordCount();
+
+                clearTimeout(
+                    predictionTimeout
+                );
+
+
+                predictionTimeout =
+                    setTimeout(
+                        getPredictions,
+                        350
+                    );
+            }
+        );
+
+
+        // --------------------------------------------
+        // Keyboard shortcut
+        // --------------------------------------------
+
+        textInput.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.ctrlKey &&
+                    event.key === "Enter"
+                ) {
+
+                    event.preventDefault();
+
+                    clearTimeout(
+                        predictionTimeout
+                    );
+
+                    getPredictions();
+                }
+            }
+        );
+
+
+        // --------------------------------------------
+        // HTML escaping
+        // --------------------------------------------
+
+        function escapeHTML(value) {
+
+            return value
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+    </script>
+
+</body>
+</html>
